@@ -3,5 +3,11 @@
     "openai_api_key": "",
     "google_api_key": "",
     "grok_api_key": "",
-    "deepseek_api_key": ""
+    "deepseek_api_key": "",
+    "enable_vulncheck": false,
+    "enable_nuclei": false,
+    "enable_metasploit": true,
+    "enable_exploitdb": true,
+    "enable_github_poc": true,
+	"enable_nvd": true
 }

@@ -30,6 +30,7 @@ from .fetchers.exploitdb import fetch_exploitdb_data
 from .fetchers.github_poc import fetch_github_pocs
 from .fetchers.hackerone import fetch_hackerone_cve_details
 from .fetchers.metasploit import fetch_metasploit_modules_for_cve
+from .fetchers.nvd import fetch_nvd_exploits
 from .metrics import calculate_priority
 from .compose import compile_cve_details
 from .ai import get_risk_assessment
@@ -70,50 +71,44 @@ def _ensure_cve_loaded(cve_id: str, *, fast_mode: bool, config: Dict[str, Any]) 
 
 
 def _public_exploits_bundle(cve_id: str, *, config: Dict[str, Any], cve_data: Dict[str, Any]) -> Dict[str, Any]:
-    github_data, _ = fetch_github_pocs(cve_id)
+    github_data = vulncheck_data = nuclei_data = exploitdb_data = metasploit_data = nvd_data = None
+    vulncheck_error = nvd_error = None
+    
+    # GitHub PoC (woks only if true in config)
+    if config.get("enable_github_poc", True):
+        github_data, _ = fetch_github_pocs(cve_id)
 
-    # Fallback: if PoC-in-GitHub API returns nothing, derive GitHub entries from CVE references
-    # Use strict URL parsing and host allow‑list to avoid substring-based checks.
-    if not (github_data and isinstance(github_data, dict) and github_data.get("pocs")):
-        try:
-            from urllib.parse import urlparse
-            refs = (cve_data or {}).get("containers", {}).get("cna", {}).get("references", [])
-            fallback: list[dict] = []
-            allowed_hosts = {
-                "github.com",
-                "www.github.com",
-                "gist.github.com",
-                "raw.githubusercontent.com",
-            }
-            for ref in refs or []:
-                url = (ref or {}).get("url", "")
-                try:
-                    parsed = urlparse(url)
-                    host = (parsed.hostname or "").lower()
-                    scheme_ok = parsed.scheme in {"http", "https"}
-                    if scheme_ok and host in allowed_hosts:
-                        fallback.append({"html_url": url, "created_at": "N/A"})
-                except Exception:
-                    # Ignore malformed URLs
-                    continue
-            if fallback:
-                github_data = {"pocs": fallback}
-        except Exception:
-            # best-effort only
-            pass
+    # VulnCheck (woks only if true in config)
+    if config.get("enable_vulncheck", True):
+        vulncheck_data, vulncheck_error = fetch_vulncheck_data(cve_id, config=config)
 
-    vulncheck_data, vulncheck_error = fetch_vulncheck_data(cve_id, config=config)
-    exploitdb_data, _ = fetch_exploitdb_data(cve_id)
-    nuclei_data, _ = fetch_nuclei_data(cve_id)
-    metasploit_data, _ = fetch_metasploit_modules_for_cve(cve_id)
+    # ExploitDB (woks only if true in config)
+    if config.get("enable_exploitdb", True):
+        exploitdb_data, _ = fetch_exploitdb_data(cve_id)
 
+    # Nuclei (woks only if true in config)
+    if config.get("enable_nuclei", True):
+        nuclei_data, _ = fetch_nuclei_data(cve_id)
+
+    # Metasploit (woks only if true in config)
+    if config.get("enable_metasploit", True):
+        metasploit_data, _ = fetch_metasploit_modules_for_cve(cve_id)
+    
+    # NVD Exploits (woks only if true in config)
+    if config.get("enable_nvd", True):
+        nvd_data, nvd_error = fetch_nvd_exploits(cve_id)
+
+    # Visualisation with config
     display_public_exploits(
         github_data=github_data,
         vulncheck_data=vulncheck_data if isinstance(vulncheck_data, dict) else {},
         exploitdb_data=exploitdb_data,
         nuclei_data=nuclei_data,
         metasploit_data=metasploit_data,
+        nvd_data=nvd_data,
         vulncheck_error=vulncheck_error,
+        nvd_error=nvd_error,
+        config=config
     )
 
     return {
@@ -123,7 +118,9 @@ def _public_exploits_bundle(cve_id: str, *, config: Dict[str, Any], cve_data: Di
         "packetstorm_data": {},
         "nuclei_data": nuclei_data,
         "metasploit_data": metasploit_data,
+        "nvd_data": nvd_data,
         "vulncheck_error": vulncheck_error,
+        "nvd_error": nvd_error,
     }
 
 
@@ -199,6 +196,7 @@ def main(
                 "GitHub Data": None,
                 "VulnCheck Data": None,
                 "ExploitDB Data": None,
+                "NVD Data": None,
                 "PacketStorm Data": {},
                 "HackerOne Data": None,
                 "Priority": {"Priority": 0},
@@ -207,7 +205,7 @@ def main(
             all_results.append(cve_result)
             continue
 
-        # Public exploits
+        # Public exploits (с учетом конфига)
         pub = _public_exploits_bundle(cve_id, config=config, cve_data=cve_data)
 
         # EPSS
@@ -246,7 +244,7 @@ def main(
             # display_ai_risk_assessment now returns the assessment text
             risk_assessment = display_ai_risk_assessment(details, cve_data, ai_provider, _fetch_ai)
 
-        # Priority
+        # Priority (push config and NVD data)
         priority = None
         if "prio" in selected:
             priority = calculate_priority(
@@ -257,6 +255,8 @@ def main(
                 cisa_data=(None if "cisa" not in selected else {"vulnerabilities": [extract_cve_entry(cve_id, fetch_cisa_data()[0])]}),
                 vulncheck_data=pub.get("vulncheck_data"),
                 exploitdb_data=pub.get("exploitdb_data"),
+                nvd_data=pub.get("nvd_data"),
+                config=config
             )
             display_priority_rating(cve_id, priority)
 
@@ -272,8 +272,9 @@ def main(
             "GitHub Data": pub.get("github_data"),
             "VulnCheck Data": pub.get("vulncheck_data"),
             "ExploitDB Data": pub.get("exploitdb_data"),
+            "NVD Data": pub.get("nvd_data"),
             "Metasploit Data": pub.get("metasploit_data"),
-            "PacketStorm Data": {},  # removed; keep for template compatibility
+            "PacketStorm Data": {},
             "HackerOne Data": hackerone_data,
             "Priority": {"Priority": priority},
             "Risk Assessment": risk_assessment,

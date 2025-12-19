@@ -53,8 +53,16 @@ def _handle_cvss(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             if isinstance(mods, list):
                 metasploit_count = len(mods)
 
-        # Public Exploits Total
-        result["Public Exploits Total"] = github_pocs + vulncheck_count + edb_count + nuclei_count + metasploit_count
+        # NVD Exploits - ДОБАВЛЕНО
+        nvd_count = 0
+        nvd = result.get("NVD Data") or {}
+        if isinstance(nvd, dict):
+            exploits = nvd.get("exploits") or []
+            if isinstance(exploits, list):
+                nvd_count = len(exploits)
+
+        # Public Exploits Total (ДОБАВЛЕН NVD)
+        result["Public Exploits Total"] = github_pocs + vulncheck_count + edb_count + nuclei_count + metasploit_count + nvd_count
 
         # Sort GitHub PoCs (by created_at desc) if present
         if isinstance(gd, dict) and isinstance(pocs, list) and pocs:
@@ -86,6 +94,12 @@ def _handle_cvss(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 key=lambda x: x.get("date", ""),
                 reverse=True,
             )
+
+        # NVD Exploits (уже отсортированы от API)
+        if isinstance(nvd, dict):
+            exploits = nvd.get("exploits") or []
+            if isinstance(exploits, list) and exploits:
+                result["NVD Data"] = {"exploits": exploits}
 
         # Normalize EPSS to float
         epss = result.get("EPSS Data")

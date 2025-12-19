@@ -21,6 +21,12 @@ _DEFAULT_CONFIG: Dict[str, Any] = {
     "grok_api_key": None,
     "deepseek_api_key": None,
     "local_database_dir": None,
+    "enable_vulncheck": True,     # Turn on VulnCheck checker
+    "enable_nuclei": True,        # Turn on Nuclei checker
+    "enable_metasploit": True,    # Turn on Metasploit checker
+    "enable_exploitdb": True,     # Turn on ExploitDB checker
+    "enable_github_poc": True,    # Turn on GitHub PoC checker
+    "enable_nvd": True,           # Turn on NVD Search checker
 }
 
 

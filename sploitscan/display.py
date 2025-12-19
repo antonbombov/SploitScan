@@ -126,14 +126,20 @@ def display_public_exploits(
     exploitdb_data: Optional[List[Dict[str, Any]]],
     nuclei_data: Optional[Dict[str, Any]],
     metasploit_data: Optional[Dict[str, Any]] = None,
+    nvd_data: Optional[Dict[str, Any]] = None,
     vulncheck_error: Optional[str] = None,
+    nvd_error: Optional[str] = None,
+    config: Optional[Dict[str, Any]] = None
 ) -> None:
+    
+    config = config or {}
+    
     def template() -> Tuple[List[str], int]:
         total_exploits = 0
         entries: List[str] = []
 
-        # GitHub
-        if github_data and github_data.get("pocs"):
+        # GitHub (woks only if true in config)
+        if config.get("enable_github_poc", True) and github_data and github_data.get("pocs"):
             entries.append("├ GitHub")
             sorted_pocs = sorted(github_data["pocs"], key=lambda x: x.get("created_at", ""), reverse=True)
             for poc in sorted_pocs:
@@ -143,30 +149,31 @@ def display_public_exploits(
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
 
-        # VulnCheck
-        if vulncheck_data and isinstance(vulncheck_data, dict) and vulncheck_data.get("data"):
-            entries.append("│")
-            entries.append("├ VulnCheck")
-            sorted_vulncheck = sorted(
-                (xdb for item in vulncheck_data["data"] for xdb in item.get("vulncheck_xdb", [])),
-                key=lambda x: x.get("date_added", ""),
-                reverse=True,
-            )
-            for xdb in sorted_vulncheck:
-                github_url = xdb.get("clone_ssh_url", "").replace("git@github.com:", "https://github.com/").replace(
-                    ".git", ""
+        # VulnCheck (woks only if true in config)
+        if config.get("enable_vulncheck", True):
+            if vulncheck_data and isinstance(vulncheck_data, dict) and vulncheck_data.get("data"):
+                entries.append("│")
+                entries.append("├ VulnCheck")
+                sorted_vulncheck = sorted(
+                    (xdb for item in vulncheck_data["data"] for xdb in item.get("vulncheck_xdb", [])),
+                    key=lambda x: x.get("date_added", ""),
+                    reverse=True,
                 )
-                entries.append(f"│  ├ {github_url}")
-                total_exploits += 1
-            if entries:
-                entries[-1] = entries[-1].replace("├", "└")
+                for xdb in sorted_vulncheck:
+                    github_url = xdb.get("clone_ssh_url", "").replace("git@github.com:", "https://github.com/").replace(
+                        ".git", ""
+                    )
+                    entries.append(f"│  ├ {github_url}")
+                    total_exploits += 1
+                if entries:
+                    entries[-1] = entries[-1].replace("├", "└")
 
-        if vulncheck_error:
-            entries.append("│")
-            entries.append(f"└ ❌ VulnCheck Error: {vulncheck_error}")
+            if vulncheck_error:
+                entries.append("│")
+                entries.append(f"└ ❌ VulnCheck Error: {vulncheck_error}")
 
-        # Exploit-DB
-        if exploitdb_data:
+        # Exploit-DB (woks only if true in config)
+        if config.get("enable_exploitdb", True) and exploitdb_data:
             entries.append("│")
             entries.append("├ Exploit-DB")
             sorted_exploitdb = sorted(exploitdb_data, key=lambda x: x.get("date", ""), reverse=True)
@@ -177,8 +184,8 @@ def display_public_exploits(
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
 
-        # Metasploit
-        if metasploit_data and isinstance(metasploit_data, dict) and metasploit_data.get("modules"):
+        # Metasploit (woks only if true in config)
+        if config.get("enable_metasploit", True) and metasploit_data and isinstance(metasploit_data, dict) and metasploit_data.get("modules"):
             entries.append("│")
             entries.append("├ Metasploit")
             for m in metasploit_data.get("modules", []):
@@ -196,8 +203,8 @@ def display_public_exploits(
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
 
-        # Nuclei
-        if nuclei_data and (nuclei_data.get("file_path") or nuclei_data.get("raw_url")):
+        # Nuclei (woks only if true in config)
+        if config.get("enable_nuclei", True) and nuclei_data and (nuclei_data.get("file_path") or nuclei_data.get("raw_url")):
             entries.append("│")
             entries.append("├ Nuclei")
             url = nuclei_data.get("raw_url")
@@ -209,6 +216,21 @@ def display_public_exploits(
                 total_exploits += 1
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
+        
+        # NVD Exploits (woks only if true in config)
+        if config.get("enable_nvd", True):
+            if nvd_data and isinstance(nvd_data, dict) and nvd_data.get("exploits"):
+                entries.append("│")
+                entries.append("├ NVD Exploits")
+                for exploit_url in nvd_data["exploits"]:
+                    entries.append(f"│  ├ {exploit_url}")
+                    total_exploits += 1
+                if entries:
+                    entries[-1] = entries[-1].replace("├", "└")
+            
+            if nvd_error:
+                entries.append("│")
+                entries.append(f"└ ❌ NVD Error: {nvd_error}")
 
         if not entries:
             return (["└ ❌ No data found."], total_exploits)

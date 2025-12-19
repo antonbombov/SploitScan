@@ -66,9 +66,13 @@ def calculate_priority(
     cisa_data: Optional[Dict[str, Any]],
     vulncheck_data: Optional[Dict[str, Any]],
     exploitdb_data: Optional[list],
+    nvd_data: Optional[Dict[str, Any]] = None,
+    config: Optional[Dict[str, Any]] = None
 ) -> Optional[str]:
     """
-    Compute patching priority letter:
+    Compute patching priority letter with config-aware exploit detection
+    
+    Priority logic:
       - A+ if listed in CISA KEV or any public exploit observed
       - A if CVSS >= CVSS_THRESHOLD and EPSS >= EPSS_THRESHOLD
       - B if CVSS >= CVSS_THRESHOLD
@@ -76,6 +80,8 @@ def calculate_priority(
       - D otherwise when at least one signal exists
       - None if no signals are present
     """
+    config = config or {}  # Check for None
+    
     cvss_score = 0.0
     epss_score = 0.0
 
@@ -96,12 +102,22 @@ def calculate_priority(
         in_cisa_kev = any(isinstance(v, dict) and v.get("cveID") == cve_id for v in vulns)
 
     has_public_exploits = False
-    if github_data and isinstance(github_data, dict):
+    
+    # GitHub exploits (if true in config)
+    if config.get("enable_github_poc", True) and github_data and isinstance(github_data, dict):
         has_public_exploits = bool(github_data.get("pocs"))
-    if not has_public_exploits and vulncheck_data and isinstance(vulncheck_data, dict):
+    
+    # VulnCheck exploits (if true in config)
+    if not has_public_exploits and config.get("enable_vulncheck", True) and vulncheck_data and isinstance(vulncheck_data, dict):
         has_public_exploits = bool(vulncheck_data.get("data"))
-    if not has_public_exploits and exploitdb_data:
+    
+    # ExploitDB exploits (if true in config)
+    if not has_public_exploits and config.get("enable_exploitdb", True) and exploitdb_data:
         has_public_exploits = bool(exploitdb_data)
+    
+    # NVD exploits (if true in config)
+    if not has_public_exploits and config.get("enable_nvd", True) and nvd_data and isinstance(nvd_data, dict):
+        has_public_exploits = bool(nvd_data.get("exploits"))
 
     if not (cvss_score or epss_score or in_cisa_kev or has_public_exploits):
         return None

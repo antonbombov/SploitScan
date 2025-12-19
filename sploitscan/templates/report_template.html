@@ -321,6 +321,7 @@
                 (r.get('VulnCheck Data') and (r['VulnCheck Data'].get('data')|sum(attribute='vulncheck_xdb')|length if r['VulnCheck Data'].get('data') else 0) or 0) +
                 (r.get('ExploitDB Data') and r['ExploitDB Data']|length or 0) +
                 (r.get('Metasploit Data') and r['Metasploit Data'].get('modules')|length or 0) +
+                (r.get('NVD Data') and r['NVD Data'].get('exploits')|length or 0) + 
                 ((r.get('Nuclei Data') and (r['Nuclei Data'].get('file_path') or r['Nuclei Data'].get('raw_url'))) and 1 or 0)
               ) %}
             {% endif %}
@@ -396,6 +397,7 @@
                     (r.get('VulnCheck Data') and (r['VulnCheck Data'].get('data')|sum(attribute='vulncheck_xdb')|length if r['VulnCheck Data'].get('data') else 0) or 0) +
                     (r.get('ExploitDB Data') and r['ExploitDB Data']|length or 0) +
                     (r.get('Metasploit Data') and r['Metasploit Data'].get('modules')|length or 0) +
+                    (r.get('NVD Data') and r['NVD Data'].get('exploits')|length or 0) + 
                     ((r.get('Nuclei Data') and (r['Nuclei Data'].get('file_path') or r['Nuclei Data'].get('raw_url'))) and 1 or 0)
                   ) %}
                   <tr class="table-row" data-cve="{{ cve_id }}" data-prio="{{ pr }}" data-cisa="{{ cisa }}" data-expl="{{ expl }}">
@@ -447,6 +449,7 @@
             {% endif %}
             {% set edb_count = cve['ExploitDB Data'] and cve['ExploitDB Data']|length or 0 %}
             {% set msf_count = (cve['Metasploit Data'] and cve['Metasploit Data'].get('modules')|length) or 0 %}
+            {% set nvd_exploits = cve['NVD Data'] and cve['NVD Data'].get('exploits') or [] %}
             {% set nuclei_link = None %}
             {% if cve['Nuclei Data'] %}
               {% if cve['Nuclei Data'].get('raw_url') %}
@@ -466,7 +469,7 @@
                   {% if cisa_listed %}
                     <span class="badge bg-green-100 text-green-700 dark:bg-green-800/40 dark:text-green-100">CISA KEV</span>
                   {% endif %}
-                  {% if (github_count + vulncheck_count + edb_count + msf_count + (nuclei_link and 1 or 0)) > 0 %}
+                  {% if (github_count + vulncheck_count + edb_count + msf_count + nvd_exploits|length + (nuclei_link and 1 or 0)) > 0 %}
                     <span class="badge bg-blue-100 text-blue-700 dark:bg-blue-800/40 dark:text-blue-100">Has Exploits</span>
                   {% endif %}
                   {% if cve['Risk Assessment'] %}
@@ -576,6 +579,17 @@
                           </div>
                         {% endif %}
 
+                        {% if nvd_exploits|length > 0 %}
+                          <div>
+                            <div class="font-medium mb-1">NVD</div>
+                            <ul class="list-disc pl-5 space-y-1">
+                              {% for exploit_url in nvd_exploits %}
+                                <li><a href="{{ exploit_url }}" target="_blank" class="link">{{ exploit_url }}</a></li>
+                              {% endfor %}
+                            </ul>
+                          </div>
+                        {% endif %}
+
                         {% if nuclei_link %}
                           <div>
                             <div class="font-medium mb-1">Nuclei</div>
@@ -585,7 +599,7 @@
                           </div>
                         {% endif %}
 
-                        {% if (github_count + vulncheck_count + edb_count + (nuclei_link and 1 or 0)) == 0 %}
+                        {% if (github_count + vulncheck_count + edb_count + msf_count + nvd_exploits|length + (nuclei_link and 1 or 0)) == 0 %}
                           <div class="muted">No public exploits found.</div>
                         {% endif %}
                       </div>
