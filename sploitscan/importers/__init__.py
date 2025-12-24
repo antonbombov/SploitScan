@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import re
 import xml.etree.ElementTree as ET
+import os
+import pathlib
 from typing import Callable, Iterable, List, Optional
-
 
 _CVE_REGEX = re.compile(r"CVE-\d{4}-\d{4,7}$")
 
