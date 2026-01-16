@@ -121,24 +121,23 @@ def display_cisa_status(cve_id: str, cisa_data: Optional[Dict[str, Any]], error:
 
 
 def display_public_exploits(
-    github_data: Optional[Dict[str, Any]],
-    vulncheck_data: Optional[Dict[str, Any]],
-    exploitdb_data: Optional[List[Dict[str, Any]]],
-    nuclei_data: Optional[Dict[str, Any]],
-    metasploit_data: Optional[Dict[str, Any]] = None,
-    nvd_data: Optional[Dict[str, Any]] = None,
-    vulncheck_error: Optional[str] = None,
-    nvd_error: Optional[str] = None,
-    config: Optional[Dict[str, Any]] = None
+        github_data: Optional[Dict[str, Any]],
+        vulncheck_data: Optional[Dict[str, Any]],
+        exploitdb_data: Optional[List[Dict[str, Any]]],
+        nuclei_data: Optional[Dict[str, Any]],
+        metasploit_data: Optional[Dict[str, Any]] = None,
+        nvd_data: Optional[Dict[str, Any]] = None,
+        vulncheck_error: Optional[str] = None,
+        nvd_error: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None
 ) -> None:
-    
     config = config or {}
-    
+
     def template() -> Tuple[List[str], int]:
         total_exploits = 0
         entries: List[str] = []
 
-        # GitHub (woks only if true in config)
+        # GitHub (только если включен в конфиге)
         if config.get("enable_github_poc", True) and github_data and github_data.get("pocs"):
             entries.append("├ GitHub")
             sorted_pocs = sorted(github_data["pocs"], key=lambda x: x.get("created_at", ""), reverse=True)
@@ -149,7 +148,7 @@ def display_public_exploits(
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
 
-        # VulnCheck (woks only if true in config)
+        # VulnCheck (только если включен в конфиге)
         if config.get("enable_vulncheck", True):
             if vulncheck_data and isinstance(vulncheck_data, dict) and vulncheck_data.get("data"):
                 entries.append("│")
@@ -172,7 +171,7 @@ def display_public_exploits(
                 entries.append("│")
                 entries.append(f"└ ❌ VulnCheck Error: {vulncheck_error}")
 
-        # Exploit-DB (woks only if true in config)
+        # Exploit-DB (только если включен в конфиге)
         if config.get("enable_exploitdb", True) and exploitdb_data:
             entries.append("│")
             entries.append("├ Exploit-DB")
@@ -184,8 +183,10 @@ def display_public_exploits(
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
 
-        # Metasploit (woks only if true in config)
-        if config.get("enable_metasploit", True) and metasploit_data and isinstance(metasploit_data, dict) and metasploit_data.get("modules"):
+        # Metasploit (только если включен в конфиге)
+        if config.get("enable_metasploit", True) and metasploit_data and isinstance(metasploit_data,
+                                                                                    dict) and metasploit_data.get(
+                "modules"):
             entries.append("│")
             entries.append("├ Metasploit")
             for m in metasploit_data.get("modules", []):
@@ -203,8 +204,9 @@ def display_public_exploits(
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
 
-        # Nuclei (woks only if true in config)
-        if config.get("enable_nuclei", True) and nuclei_data and (nuclei_data.get("file_path") or nuclei_data.get("raw_url")):
+        # Nuclei (только если включен в конфиге)
+        if config.get("enable_nuclei", True) and nuclei_data and (
+                nuclei_data.get("file_path") or nuclei_data.get("raw_url")):
             entries.append("│")
             entries.append("├ Nuclei")
             url = nuclei_data.get("raw_url")
@@ -216,21 +218,27 @@ def display_public_exploits(
                 total_exploits += 1
             if entries:
                 entries[-1] = entries[-1].replace("├", "└")
-        
-        # NVD Exploits (woks only if true in config)
+
+        # NVD Exploits (только если включен в конфиге)
         if config.get("enable_nvd", True):
-            if nvd_data and isinstance(nvd_data, dict) and nvd_data.get("exploits"):
+            if nvd_data and isinstance(nvd_data, dict):
+                exploits = nvd_data.get("exploits", [])
+                if exploits:
+                    entries.append("│")
+                    entries.append("├ NVD")
+                    for exploit_url in exploits:
+                        entries.append(f"│  ├ {exploit_url}")
+                        total_exploits += 1
+                    if entries:
+                        entries[-1] = entries[-1].replace("├", "└")
+
+            # Отображаем NVD ошибку только если это не 429 (rate limit)
+            if nvd_error and "429" not in nvd_error:
                 entries.append("│")
-                entries.append("├ NVD Exploits")
-                for exploit_url in nvd_data["exploits"]:
-                    entries.append(f"│  ├ {exploit_url}")
-                    total_exploits += 1
-                if entries:
-                    entries[-1] = entries[-1].replace("├", "└")
-            
-            if nvd_error:
+                entries.append(f"└ ⚠️ NVD Error: {nvd_error}")
+            elif nvd_error and "429" in nvd_error:
                 entries.append("│")
-                entries.append(f"└ ❌ NVD Error: {nvd_error}")
+                entries.append(f"└ ⚠️ NVD rate limited (will retry later)")
 
         if not entries:
             return (["└ ❌ No data found."], total_exploits)
