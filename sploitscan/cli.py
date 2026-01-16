@@ -124,25 +124,38 @@ def _public_exploits_bundle(cve_id: str, *, config: Dict[str, Any], cve_data: Di
     }
 
 
-def _selected(methods: Optional[str]) -> set[str]:
+def _selected(methods: Optional[str], config: Dict[str, Any]) -> set[str]:
+    """
+    Parse methods string and filter based on config.
+    """
     default_methods = {"cisa", "epss", "hackerone", "ai", "prio", "references"}
     if not methods:
-        return default_methods
-    return {m.strip().lower() for m in methods.split(",") if m.strip()}
+        methods_set = default_methods
+    else:
+        methods_set = {m.strip().lower() for m in methods.split(",") if m.strip()}
+
+    # Фильтруем методы по конфигу
+    filtered = set()
+    for method in methods_set:
+        if method == "hackerone" and not config.get("enable_hackerone", True):
+            continue
+        filtered.add(method)
+
+    return filtered
 
 
 def main(
-    cve_ids: List[str],
-    *,
-    export_format: Optional[str] = None,
-    import_file: Optional[str] = None,
-    import_type: Optional[str] = None,
-    ai_provider: Optional[str] = None,
-    config_path: Optional[str] = None,
-    methods: Optional[str] = None,
-    debug: bool = False,
-    fast_mode: bool = False,
-    input_dir: Optional[str] = None,
+        cve_ids: List[str],
+        *,
+        export_format: Optional[str] = None,
+        import_file: Optional[str] = None,
+        import_type: Optional[str] = None,
+        ai_provider: Optional[str] = None,
+        config_path: Optional[str] = None,
+        methods: Optional[str] = None,
+        debug: bool = False,
+        fast_mode: bool = False,
+        input_dir: Optional[str] = None,
 ) -> None:
     """
     Orchestrate SploitScan workflow for one or more CVE IDs.
@@ -150,7 +163,7 @@ def main(
     config = load_config(config_path=config_path, debug=debug)
 
     all_results: List[Dict[str, Any]] = []
-    selected = _selected(methods)
+    selected = _selected(methods, config)  # ← ИЗМЕНЕНИЕ: передаём config
 
     # Normalize export format
     if export_format:
@@ -230,7 +243,7 @@ def main(
         hackerone_data = None
         if "hackerone" in selected:
             hackerone_data, hacker_err = fetch_hackerone_cve_details(cve_id)
-            display_hackerone_data(hackerone_data, hacker_err)
+            display_hackerone_data(hackerone_data, hacker_err, config)  # ← ИЗМЕНЕНИЕ: передаём config
 
         # AI risk assessment
         risk_assessment = None
@@ -244,7 +257,7 @@ def main(
             # display_ai_risk_assessment now returns the assessment text
             risk_assessment = display_ai_risk_assessment(details, cve_data, ai_provider, _fetch_ai)
 
-        # Priority (push config and NVD data)
+        # Priority (передаем конфиг и NVD данные)
         priority = None
         if "prio" in selected:
             priority = calculate_priority(
@@ -252,7 +265,8 @@ def main(
                 cve_data=cve_data,
                 epss_data=epss_data,
                 github_data=pub.get("github_data"),
-                cisa_data=(None if "cisa" not in selected else {"vulnerabilities": [extract_cve_entry(cve_id, fetch_cisa_data()[0])]}),
+                cisa_data=(None if "cisa" not in selected else {
+                    "vulnerabilities": [extract_cve_entry(cve_id, fetch_cisa_data()[0])]}),
                 vulncheck_data=pub.get("vulncheck_data"),
                 exploitdb_data=pub.get("exploitdb_data"),
                 nvd_data=pub.get("nvd_data"),

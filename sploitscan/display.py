@@ -257,8 +257,21 @@ def display_public_exploits(
         print(f"└ ❌ No data found.\n")
 
 
-def display_hackerone_data(hackerone_data: Optional[Dict[str, Any]], error: Optional[str] = None) -> None:
+def display_hackerone_data(
+        hackerone_data: Optional[Dict[str, Any]],
+        error: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None
+) -> None:
+    """
+    Display HackerOne data or message if disabled.
+    """
+    config = config or {}
+
     def template(data: Optional[Dict[str, Any]]) -> List[str]:
+        # Если HackerOne отключен в конфиге
+        if not config.get("enable_hackerone", True):
+            return ["└ ⚠️ HackerOne disabled in config"]
+
         if error:
             return [f"└ {error}"]
         if not data or "data" not in data or "cve_entry" not in data["data"]:
@@ -281,7 +294,8 @@ def display_hackerone_data(hackerone_data: Optional[Dict[str, Any]], error: Opti
             f"Unknown: {severity_unknown} / None: {severity_none} / Low: {severity_low} / "
             f"Medium: {severity_medium} / High: {severity_high} / Critical: {severity_critical}"
         )
-        return [f"├ Rank:        {rank}", f"├ Reports:     {reports_submitted_count}", f"└ Severity:    {severity_display}"]
+        return [f"├ Rank:        {rank}", f"├ Reports:     {reports_submitted_count}",
+                f"└ Severity:    {severity_display}"]
 
     _display_section("🕵️ HackerOne Hacktivity", template(hackerone_data))
 

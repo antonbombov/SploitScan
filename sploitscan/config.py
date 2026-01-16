@@ -27,6 +27,7 @@ _DEFAULT_CONFIG: Dict[str, Any] = {
     "enable_exploitdb": True,     # Turn on ExploitDB checker
     "enable_github_poc": True,    # Turn on GitHub PoC checker
     "enable_nvd": True,           # Turn on NVD Search checker
+    "enable_hackerone": False,     # Turn on HackerOne Search checker
 }
 
 

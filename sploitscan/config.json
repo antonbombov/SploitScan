@@ -9,5 +9,6 @@
     "enable_metasploit": true,
     "enable_exploitdb": true,
     "enable_github_poc": true,
-	"enable_nvd": true
+    "enable_nvd": true,
+    "enable_hackerone": false
 }
