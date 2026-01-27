@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 from typing import Any, Dict, List, Optional
 
 from .constants import VERSION, BLUE, GREEN, YELLOW, ENDC
@@ -193,10 +194,24 @@ def main(
         print_cve_header(cve_id)
 
         # Load core CVE data
-        cve_data = _ensure_cve_loaded(cve_id, fast_mode=fast_mode, config=config)
+        #cve_data = _ensure_cve_loaded(cve_id, fast_mode=fast_mode, config=config)
+        #display_cve_data(cve_data, None if cve_data else "❌ Unable to load CVE data")
+        cve_data = None
+        for delay in [0, 15, 25, 35, 45]:
+            if delay > 0:
+                print(f"Re-request with delay {delay}s")
+                time.sleep(delay)
+            cve_data = _ensure_cve_loaded(cve_id, fast_mode=fast_mode, config=config)
+            if cve_data:
+                break
+
         display_cve_data(cve_data, None if cve_data else "❌ Unable to load CVE data")
+
         if not cve_data:
             # Skip to next CVE if core data missing
+            delay = 15
+            print(f"Delay {delay}s and go to next CVE")
+            time.sleep(delay)
             continue
 
         # Fast mode: basic info only
