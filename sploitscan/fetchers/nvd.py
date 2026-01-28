@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import requests
 import time
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 
 def fetch_nvd_exploits(cve_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -20,13 +19,12 @@ def fetch_nvd_exploits(cve_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[
         try:
             # Ждем перед запросом
             wait_time = delays[attempt]
-            if attempt > 0:  # Не показываем для первой попытки
+            if attempt > 0:
                 print(f"⏳ NVD retry {attempt + 1}/{max_retries} для {cve_id}, ждем {wait_time}с...")
             time.sleep(wait_time)
 
             response = requests.get(url, timeout=30)
 
-            # Если 429 - пробуем снова
             if response.status_code == 429:
                 if attempt < max_retries - 1:
                     print(f"⚠️ NVD 429 для {cve_id}, следующая попытка через {delays[attempt + 1]}с")
@@ -35,7 +33,6 @@ def fetch_nvd_exploits(cve_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[
                     print(f"❌ NVD rate limit для {cve_id} после {max_retries} попыток")
                     return {"exploits": []}, f"NVD rate limit (429) after {max_retries} attempts"
 
-            # Другие ошибки HTTP
             if response.status_code >= 400:
                 print(f"❌ NVD HTTP error {response.status_code} для {cve_id}")
                 return {"exploits": []}, f"NVD HTTP error: {response.status_code}"
@@ -49,12 +46,18 @@ def fetch_nvd_exploits(cve_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[
                 vulnerabilities = data.get('vulnerabilities', [])
                 if vulnerabilities:
                     references = vulnerabilities[0]['cve'].get('references', [])
-                    exploits = [
-                        ref['url'] for ref in references
-                        if any('exploit' in tag.lower() for tag in ref.get('tags', []))
-                    ]
 
-            # Если успех после retry
+                    # Собираем все ссылки с тегом exploit
+                    exploit_urls = []
+                    for ref in references:
+                        tags = ref.get('tags', [])
+                        url_value = ref.get('url', '').strip()
+                        if any('exploit' in tag.lower() for tag in tags) and url_value:
+                            exploit_urls.append(url_value)
+
+                    # Убираем дубликаты (сохраняя порядок)
+                    exploits = list(dict.fromkeys(exploit_urls))
+
             if attempt > 0:
                 print(f"✅ NVD для {cve_id} получен после {attempt + 1} попыток")
 
