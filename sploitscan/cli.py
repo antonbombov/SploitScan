@@ -42,6 +42,8 @@ from .exporters.html_exporter import export_to_html
 from .exporters.json_exporter import export_to_json
 from .exporters.csv_exporter import export_to_csv
 
+from .retry import retryit
+
 
 def _configure_console_encoding() -> None:
     """
@@ -57,6 +59,7 @@ def _configure_console_encoding() -> None:
         pass
 
 
+@retryit
 def _ensure_cve_loaded(cve_id: str, *, fast_mode: bool, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Load CVE JSON either from local DB (fast path) or from GitHub.
@@ -74,7 +77,7 @@ def _ensure_cve_loaded(cve_id: str, *, fast_mode: bool, config: Dict[str, Any]) 
 def _public_exploits_bundle(cve_id: str, *, config: Dict[str, Any], cve_data: Dict[str, Any]) -> Dict[str, Any]:
     github_data = vulncheck_data = nuclei_data = exploitdb_data = metasploit_data = nvd_data = None
     vulncheck_error = nvd_error = None
-    
+
     # GitHub PoC (woks only if true in config)
     if config.get("enable_github_poc", True):
         github_data, _ = fetch_github_pocs(cve_id)
@@ -94,7 +97,7 @@ def _public_exploits_bundle(cve_id: str, *, config: Dict[str, Any], cve_data: Di
     # Metasploit (woks only if true in config)
     if config.get("enable_metasploit", True):
         metasploit_data, _ = fetch_metasploit_modules_for_cve(cve_id)
-    
+
     # NVD Exploits (woks only if true in config)
     if config.get("enable_nvd", True):
         nvd_data, nvd_error = fetch_nvd_exploits(cve_id)
@@ -194,19 +197,8 @@ def main(
         print_cve_header(cve_id)
 
         # Load core CVE data
-        #cve_data = _ensure_cve_loaded(cve_id, fast_mode=fast_mode, config=config)
-        #display_cve_data(cve_data, None if cve_data else "❌ Unable to load CVE data")
-        cve_data = None
-        for delay in [0, 15, 25, 35, 45]:
-            if delay > 0:
-                print(f"Re-request with delay {delay}s")
-                time.sleep(delay)
-            cve_data = _ensure_cve_loaded(cve_id, fast_mode=fast_mode, config=config)
-            if cve_data:
-                break
-
+        cve_data = _ensure_cve_loaded(cve_id, fast_mode=fast_mode, config=config)
         display_cve_data(cve_data, None if cve_data else "❌ Unable to load CVE data")
-
         if not cve_data:
             # Skip to next CVE if core data missing
             delay = 15
