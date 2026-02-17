@@ -11,7 +11,10 @@ from typing import Any, Dict, Optional, Tuple
 from ..constants import GITHUB_API_URL
 from .common import fetch_json
 
+from ..retry import retryit
 
+
+@retryit
 def fetch_github_pocs(cve_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
     Fetch GitHub PoCs for the given CVE ID.
