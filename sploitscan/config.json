@@ -8,7 +8,7 @@
     "enable_nuclei": false,
     "enable_metasploit": true,
     "enable_exploitdb": true,
-    "enable_github_poc": true,
+    "enable_github_poc": false,
     "enable_nvd": true,
     "enable_hackerone": false
 }
